@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import ClienteForm from '@/components/ClienteForm';
+import QRScannerCamera from '@/components/QRScannerCamera';
 import { obtenerProductoPorCodigo } from '@/lib/productos';
 import { obtenerClientes, crearCliente } from '@/lib/clientes';
 import { asignarProductoACliente } from '@/lib/pedidos';
@@ -22,6 +23,7 @@ function VentaRapidaContenido() {
   const [busquedaCliente, setBusquedaCliente] = useState('');
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
+  const [escaneando, setEscaneando] = useState(false);
 
   const [asignando, setAsignando] = useState(false);
   const [ultimaAsignacion, setUltimaAsignacion] = useState<{ codigo: string; cliente: string } | null>(null);
@@ -57,6 +59,12 @@ function VentaRapidaContenido() {
     } finally {
       setBuscandoProducto(false);
     }
+  }
+
+  async function manejarQRDetectado(texto: string) {
+    setEscaneando(false);
+    setCodigo(texto);
+    await buscarProducto(texto);
   }
 
   async function asignar(cliente: Cliente) {
@@ -121,7 +129,22 @@ function VentaRapidaContenido() {
           >
             Buscar
           </button>
+          <button
+            type="button"
+            onClick={() => setEscaneando((v) => !v)}
+            className={`rounded-tag px-4 font-semibold ${
+              escaneando ? 'bg-cordel text-white' : 'bg-cordel-light text-ink'
+            }`}
+            title="Escanear QR"
+          >
+            📷
+          </button>
         </div>
+
+        <div className="mt-3">
+          <QRScannerCamera activo={escaneando} onDetectado={manejarQRDetectado} />
+        </div>
+
         {errorProducto && <p className="mt-2 text-sm font-medium text-red-600">{errorProducto}</p>}
       </section>
 

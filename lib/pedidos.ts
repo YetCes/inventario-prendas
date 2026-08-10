@@ -92,6 +92,30 @@ export async function cambiarEstadoPedido(id: string, estado: EstadoPedido): Pro
   return data as Pedido;
 }
 
+/**
+ * Cierra el ciclo de un pedido: pasa cada prenda que contiene a "Entregado"
+ * (reutilizando el mismo estado de Fase 1) y el pedido mismo a "Entregado".
+ * Se usa al terminar la Preparación de pedidos, cuando todas las prendas
+ * ya fueron verificadas por QR.
+ */
+export async function marcarPedidoComoEntregado(pedidoId: string): Promise<void> {
+  const items = await obtenerItemsDePedido(pedidoId);
+
+  if (items.length > 0) {
+    const { error: errorProductos } = await supabase
+      .from('productos')
+      .update({ estado: 'Entregado' })
+      .in(
+        'id',
+        items.map((item) => item.producto.id)
+      );
+    if (errorProductos) throw errorProductos;
+  }
+
+  const { error: errorPedido } = await supabase.from('pedidos').update({ estado: 'Entregado' }).eq('id', pedidoId);
+  if (errorPedido) throw errorPedido;
+}
+
 export interface FiltrosPedidos {
   estado?: EstadoPedido | 'Todos';
 }
@@ -129,8 +153,8 @@ export async function obtenerPedidoPorCodigo(codigo: string): Promise<PedidoConD
   if (error) throw error;
   if (!data) return null;
 
-  const items = (data as any).pedido_items as { id: string; producto: Producto }[];
-  const productos = items.map((item) => item.producto);
+  const itemsCrudos = (data as any).pedido_items as { id: string; producto: Producto | Producto[] }[];
+  const productos = itemsCrudos.map((item) => (Array.isArray(item.producto) ? item.producto[0] : item.producto));
   const total = productos.reduce((suma, p) => suma + (p.precio_venta ?? 0), 0);
 
   const { pedido_items, ...pedido } = data as any;
@@ -138,12 +162,18 @@ export async function obtenerPedidoPorCodigo(codigo: string): Promise<PedidoConD
 }
 
 /** Igual que obtenerPedidoPorCodigo, pero devuelve también el id de cada pedido_item (para poder quitarlo). */
-export async function obtenerItemsDePedido(pedidoId: string) {
+export async function obtenerItemsDePedido(pedidoId: string): Promise<{ id: string; producto: Producto }[]> {
   const { data, error } = await supabase
     .from('pedido_items')
     .select('id, producto:productos(*)')
     .eq('pedido_id', pedidoId);
 
   if (error) throw error;
-  return (data ?? []) as { id: string; producto: Producto }[];
+
+  // Supabase tipa las relaciones anidadas como arreglo por defecto (no sabe que
+  // producto_id es único), así que normalizamos a un solo objeto por seguridad.
+  return ((data ?? []) as any[]).map((item) => ({
+    id: item.id as string,
+    producto: (Array.isArray(item.producto) ? item.producto[0] : item.producto) as Producto,
+  }));
 }

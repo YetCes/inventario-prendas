@@ -1,8 +1,8 @@
-# Inventario de Prendas — Fase 1 + Fase 2
+# Inventario de Prendas — Fase 1 + Fase 2 + Fase 3
 
-Sistema web para registrar e inventariar prendas (nuevas y seminuevas) desde el celular
-o la computadora, con generación de código único, búsqueda, etiquetas imprimibles en A4,
-y ahora también clientes, pedidos y venta rápida durante transmisiones en vivo.
+Sistema web para registrar e inventariar prendas (nuevas y seminuevas), venderlas durante
+transmisiones en vivo, cobrar por Yape y preparar los pedidos para su entrega — pensado
+para usarse principalmente desde el celular.
 
 ## Qué incluye la Fase 1 (inventario)
 
@@ -16,17 +16,29 @@ y ahora también clientes, pedidos y venta rápida durante transmisiones en vivo
 ## Qué incluye la Fase 2 (clientes, reservas, Live)
 
 - **Clientes**: lista con buscador, ficha con historial de compras, alta y edición.
-- **Venta rápida**: pantalla pensada para usar durante el TikTok Live — se escribe el código
-  de la prenda, se confirma que es la correcta, y se asigna a un cliente (nuevo o existente)
-  en pocos toques. La prenda pasa automáticamente a "Reservado".
+- **Venta rápida**: pantalla pensada para usar durante el TikTok Live — se escribe (o se
+  escanea, ver Fase 3) el código de la prenda, se confirma que es la correcta, y se asigna
+  a un cliente (nuevo o existente) en pocos toques. La prenda pasa automáticamente a "Reservado".
 - **Pedidos**: agrupan las prendas asignadas a un mismo cliente. Se pueden quitar prendas
   (vuelven a "Disponible" automáticamente) y cambiar el estado del pedido
   (Abierto / Confirmado / Entregado / Cancelado).
-- El detalle de producto (Fase 1) ahora incluye el botón "Asignar a cliente" cuando la
-  prenda está Disponible.
+- El detalle de producto (Fase 1) incluye el botón "Asignar a cliente" cuando la prenda está Disponible.
 
-Los módulos de pagos por Yape y preparación de pedidos con QR (Fase 3) **no están incluidos todavía**;
-la base de datos ya quedó preparada para agregarlos sin rehacer lo construido (ver `supabase/future/`).
+## Qué incluye la Fase 3 (pagos, QR, despacho)
+
+- **Escaneo QR con la cámara**: disponible en Venta rápida (botón 📷 junto al código) y en
+  Preparación de pedidos, usando el mismo código QR que ya traen las etiquetas de Fase 1.
+- **Registrar pago**: desde el detalle de un pedido — monto, método (Yape / Efectivo /
+  Transferencia / Otro), número de operación y foto del comprobante.
+- **Pagos pendientes de validar**: pantalla para revisar los comprobantes con calma y
+  marcarlos como Validado o Rechazado. El detalle del pedido muestra si ya está "Pagado"
+  o cuánto falta.
+- **Preparación de pedidos**: se busca el pedido por código y se van escaneando las
+  prendas físicas; el sistema confirma cada una ("3 de 3 prendas verificadas") y avisa si
+  se escanea una que no pertenece al pedido. Al completarse, un botón despacha el pedido:
+  todas sus prendas pasan a "Entregado" (Fase 1) y el pedido también.
+
+Con esto queda completo el alcance definido al inicio del proyecto.
 
 ## 1. Requisitos
 
@@ -39,6 +51,7 @@ la base de datos ya quedó preparada para agregarlos sin rehacer lo construido (
 2. Ve a **SQL Editor** y ejecuta, en orden:
    - `supabase/migrations/001_init.sql` — tabla `productos`, generador de códigos y bucket de fotos.
    - `supabase/migrations/002_fase2_clientes_pedidos.sql` — tablas `clientes`, `pedidos` y `pedido_items`.
+   - `supabase/migrations/003_fase3_pagos.sql` — tabla `pagos` y bucket de comprobantes.
 3. Ve a **Project Settings → API** y copia:
    - `Project URL`
    - `anon public key`
@@ -86,12 +99,12 @@ Antes de esto, reemplaza `public/icon-192.png` y `public/icon-512.png` con el lo
 
 ```
 app/                  Pantallas: Dashboard, Nueva Prenda, Inventario, Detalle, Etiquetas,
-                       Venta rápida, Clientes, Pedidos
-components/           Piezas de interfaz reutilizables
-lib/                  Acceso a Supabase: productos, fotos, clientes, pedidos
+                       Venta rápida, Clientes, Pedidos, Registrar pago, Pagos pendientes,
+                       Preparación de pedidos
+components/           Piezas de interfaz reutilizables (incluye el escáner QR con cámara)
+lib/                  Acceso a Supabase: productos, fotos, clientes, pedidos, pagos, comprobantes
 types/                Tipos de datos compartidos
-supabase/migrations/  SQL de Fase 1 y Fase 2 (se ejecutan ahora, en orden)
-supabase/future/      SQL de referencia para Fase 3 (no se ejecuta todavía)
+supabase/migrations/  SQL de Fase 1, 2 y 3 (se ejecutan ahora, en orden)
 ```
 
 ## Notas
@@ -101,3 +114,8 @@ supabase/future/      SQL de referencia para Fase 3 (no se ejecuta todavía)
 - La hoja de etiquetas está pensada para impresoras domésticas comunes (no térmicas), en formato A4.
 - Una prenda es una unidad única: la base de datos impide que quede en dos pedidos activos a la vez.
 - Si quitas una prenda de un pedido, vuelve automáticamente a "Disponible".
+- El escaneo QR necesita permiso de cámara del navegador; en `localhost` funciona sin HTTPS,
+  pero una vez publicado (ej. en Vercel) el navegador ya sirve el sitio por HTTPS automáticamente,
+  así que no requiere configuración extra.
+- Un pedido puede tener varios pagos (por ejemplo, un adelanto y luego el resto); el sistema
+  suma solo los pagos "Validados" para saber si el pedido ya está pagado.

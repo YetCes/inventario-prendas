@@ -67,6 +67,14 @@ export default function Dashboard() {
           <BigButton href="/clientes" icon="👥" label="Clientes" variant="secondary" />
         </div>
       </section>
+
+      <section>
+        <p className="mb-3 text-sm font-semibold uppercase tracking-wide text-ink/40">Pagos y despacho</p>
+        <div className="grid grid-cols-2 gap-4">
+          <BigButton href="/preparacion" icon="📷" label="Preparar pedido" />
+          <BigButton href="/pagos-pendientes" icon="💳" label="Pagos pendientes" variant="secondary" />
+        </div>
+      </section>
     </main>
   );
 }

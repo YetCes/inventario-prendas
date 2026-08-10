@@ -5,14 +5,17 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import StatusBadge from '@/components/StatusBadge';
 import { cambiarEstadoPedido, obtenerItemsDePedido, obtenerPedidoPorCodigo, quitarProductoDePedido } from '@/lib/pedidos';
+import { obtenerPagosPorPedido } from '@/lib/pagos';
 import { ESTADOS_PEDIDO } from '@/types/pedido';
 import type { EstadoPedido, PedidoConDetalle } from '@/types/pedido';
+import type { Pago } from '@/types/pago';
 import type { Producto } from '@/types/producto';
 
 export default function DetallePedidoPage() {
   const params = useParams<{ codigo: string }>();
   const [pedido, setPedido] = useState<PedidoConDetalle | null>(null);
   const [items, setItems] = useState<{ id: string; producto: Producto }[]>([]);
+  const [pagos, setPagos] = useState<Pago[]>([]);
   const [cargando, setCargando] = useState(true);
   const [actualizando, setActualizando] = useState(false);
 
@@ -20,8 +23,12 @@ export default function DetallePedidoPage() {
     const encontrado = await obtenerPedidoPorCodigo(params.codigo);
     setPedido(encontrado);
     if (encontrado) {
-      const listaItems = await obtenerItemsDePedido(encontrado.id);
+      const [listaItems, listaPagos] = await Promise.all([
+        obtenerItemsDePedido(encontrado.id),
+        obtenerPagosPorPedido(encontrado.id),
+      ]);
       setItems(listaItems);
+      setPagos(listaPagos);
     }
   }
 
@@ -116,10 +123,42 @@ export default function DetallePedidoPage() {
           {items.length === 0 && <p className="px-4 py-8 text-center text-ink/40">Este pedido no tiene prendas.</p>}
         </ul>
 
-        <div className="mt-3 flex justify-end">
+        <div className="mt-3 flex items-center justify-between">
+          <PagoResumen total={pedido.total} pagos={pagos} />
           <span className="font-mono text-lg font-bold text-ink">Total: S/ {pedido.total.toFixed(2)}</span>
         </div>
       </section>
+
+      <section>
+        <div className="mb-2 flex items-center justify-between">
+          <h2 className="font-display text-xl text-ink">Pagos</h2>
+          <Link href={`/pedidos/${pedido.codigo}/pagos/nuevo`} className="text-sm font-semibold text-hilo">
+            + Registrar pago
+          </Link>
+        </div>
+        <ul className="flex flex-col divide-y divide-ink/5 rounded-tag bg-white ring-1 ring-ink/5">
+          {pagos.map((pago) => (
+            <li key={pago.id} className="flex items-center justify-between px-4 py-3">
+              <div>
+                <span className="block text-sm font-medium text-ink">{pago.metodo}</span>
+                <span className="text-xs text-ink/40">{new Date(pago.fecha).toLocaleDateString('es-PE')}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm font-semibold text-cordel">S/ {pago.monto.toFixed(2)}</span>
+                <EstadoValidacionBadge estado={pago.estado_validacion} />
+              </div>
+            </li>
+          ))}
+          {pagos.length === 0 && <p className="px-4 py-6 text-center text-ink/40">Todavía no se registró ningún pago.</p>}
+        </ul>
+      </section>
+
+      <Link
+        href={`/preparacion?codigo=${pedido.codigo}`}
+        className="rounded-tag bg-cordel-light px-6 py-4 text-center font-semibold text-ink hover:bg-cordel-light/70"
+      >
+        📷 Preparar pedido (verificar con QR)
+      </Link>
 
       <section>
         <p className="mb-2 text-sm font-semibold text-ink/70">Cambiar estado del pedido</p>
@@ -140,4 +179,25 @@ export default function DetallePedidoPage() {
       </section>
     </main>
   );
+}
+
+function PagoResumen({ total, pagos }: { total: number; pagos: Pago[] }) {
+  const pagado = pagos.filter((p) => p.estado_validacion === 'Validado').reduce((s, p) => s + p.monto, 0);
+  const faltante = Math.max(0, total - pagado);
+
+  if (faltante <= 0 && total > 0) {
+    return <span className="text-sm font-semibold text-estado-disponible">Pagado</span>;
+  }
+  return <span className="text-sm font-medium text-cordel">Falta S/ {faltante.toFixed(2)}</span>;
+}
+
+function EstadoValidacionBadge({ estado }: { estado: Pago['estado_validacion'] }) {
+  const estilos =
+    estado === 'Validado'
+      ? 'text-estado-disponible bg-estado-disponibleBg'
+      : estado === 'Rechazado'
+        ? 'text-red-600 bg-red-50'
+        : 'text-estado-reservado bg-estado-reservadoBg';
+
+  return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estilos}`}>{estado}</span>;
 }
