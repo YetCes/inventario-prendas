@@ -73,6 +73,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 gap-4">
           <BigButton href="/preparacion" icon="📷" label="Preparar pedido" />
           <BigButton href="/pagos-pendientes" icon="💳" label="Pagos pendientes" variant="secondary" />
+          <BigButton href="/regalos" icon="🎁" label="Regalos" variant="secondary" />
         </div>
       </section>
     </main>

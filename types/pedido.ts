@@ -1,4 +1,5 @@
 import type { Producto } from './producto';
+import type { Regalo } from './regalo';
 
 export interface Cliente {
   id: string;
@@ -28,6 +29,10 @@ export interface Pedido {
   origen: OrigenPedido;
   estado: EstadoPedido;
   creado_en: string;
+  incluye_regalo: boolean;
+  regalo_id: string | null;
+  regalo_asignado_en: string | null;
+  enlace_token: string;
 }
 
 // Pedido con sus datos relacionados ya resueltos, tal como se
@@ -36,6 +41,7 @@ export interface PedidoConDetalle extends Pedido {
   cliente: Cliente;
   productos: Producto[];
   total: number;
+  regalo: Regalo | null;
 }
 
 // Pedido resumido para listar en "Pedidos" y en el historial de un cliente.

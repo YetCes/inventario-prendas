@@ -1,8 +1,9 @@
-# Inventario de Prendas — Fase 1 + Fase 2 + Fase 3
+# Inventario de Prendas — Fase 1 + Fase 2 + Fase 3 + Fase 4
 
 Sistema web para registrar e inventariar prendas (nuevas y seminuevas), venderlas durante
-transmisiones en vivo, cobrar por Yape y preparar los pedidos para su entrega — pensado
-para usarse principalmente desde el celular.
+transmisiones en vivo, cobrar por Yape, preparar los pedidos para su entrega, y fidelizar
+a los clientes con regalos sorteados por ruleta — pensado para usarse principalmente
+desde el celular.
 
 ## Qué incluye la Fase 1 (inventario)
 
@@ -40,6 +41,38 @@ para usarse principalmente desde el celular.
 
 Con esto queda completo el alcance definido al inicio del proyecto.
 
+## Qué incluye la Fase 4 (regalos, ruleta y enlace al cliente)
+
+- **Regalos**: inventario aparte para obsequios (pueden tener varias unidades del mismo
+  artículo, sin precio ni costo). Se agregan y se ajusta su stock con botones + / −.
+- **Incluir regalo en un pedido**: checkbox disponible tanto en Venta rápida (al momento
+  de asignar la prenda) como en el detalle del pedido. Puedes elegir tú mismo qué regalo
+  darle, o dejarlo a la suerte de la ruleta.
+- **Enlace público para el cliente** (`/p/[código secreto]`, sin contraseña): desde el
+  detalle del pedido puedes compartirlo por WhatsApp o copiarlo. El cliente ve solo sus
+  prendas y el total, y confirma que su pedido es correcto.
+- **Ruleta de regalos**: si el pedido incluye regalo y no se eligió uno a mano, tras
+  confirmar aparece una ruleta — el cliente gira una sola vez y gana un regalo al azar,
+  con más probabilidad para los regalos con más stock.
+- El stock del regalo se descuenta recién cuando confirmas la entrega del pedido (no al
+  girar la ruleta) — ver la nota sobre esto más abajo.
+
+### Nota sobre el stock de regalos
+
+Como el descuento de stock ocurre al entregar (no al girar), es teóricamente posible que
+dos pedidos distintos "ganen" el mismo regalo antes de que ninguno se haya entregado, si
+el stock era muy justo. Para el volumen de un negocio como este debería ser poco frecuente,
+y lo verías reflejado en la pantalla de Regalos apenas despaches. Si más adelante prefieres
+que el regalo se "reserve" apenas se gana en la ruleta, es un ajuste chico que se puede
+agregar después.
+
+### Nota sobre el enlace público
+
+El enlace no pide contraseña (así se acordó, para mantenerlo simple): cualquiera que lo
+tenga puede abrirlo. Para que al menos no sea adivinable, usa un código secreto aparte
+(`enlace_token`) en vez del número de pedido — no es una cuenta protegida, pero tampoco es
+algo que alguien pueda simplemente enumerar probando URLs.
+
 ## 1. Requisitos
 
 - Node.js 18 o superior.
@@ -52,6 +85,7 @@ Con esto queda completo el alcance definido al inicio del proyecto.
    - `supabase/migrations/001_init.sql` — tabla `productos`, generador de códigos y bucket de fotos.
    - `supabase/migrations/002_fase2_clientes_pedidos.sql` — tablas `clientes`, `pedidos` y `pedido_items`.
    - `supabase/migrations/003_fase3_pagos.sql` — tabla `pagos` y bucket de comprobantes.
+   - `supabase/migrations/004_fase4_regalos.sql` — tabla `regalos`, columnas de regalo/enlace en `pedidos` y bucket de fotos de regalos.
 3. Ve a **Project Settings → API** y copia:
    - `Project URL`
    - `anon public key`
@@ -100,11 +134,11 @@ Antes de esto, reemplaza `public/icon-192.png` y `public/icon-512.png` con el lo
 ```
 app/                  Pantallas: Dashboard, Nueva Prenda, Inventario, Detalle, Etiquetas,
                        Venta rápida, Clientes, Pedidos, Registrar pago, Pagos pendientes,
-                       Preparación de pedidos
-components/           Piezas de interfaz reutilizables (incluye el escáner QR con cámara)
-lib/                  Acceso a Supabase: productos, fotos, clientes, pedidos, pagos, comprobantes
+                       Preparación de pedidos, Regalos, y la vista pública del pedido (/p/[token])
+components/           Piezas de interfaz reutilizables (escáner QR, ruleta de regalos, etc.)
+lib/                  Acceso a Supabase: productos, fotos, clientes, pedidos, pagos, comprobantes, regalos
 types/                Tipos de datos compartidos
-supabase/migrations/  SQL de Fase 1, 2 y 3 (se ejecutan ahora, en orden)
+supabase/migrations/  SQL de Fase 1, 2, 3 y 4 (se ejecutan ahora, en orden)
 ```
 
 ## Notas

@@ -4,31 +4,50 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import StatusBadge from '@/components/StatusBadge';
-import { cambiarEstadoPedido, obtenerItemsDePedido, obtenerPedidoPorCodigo, quitarProductoDePedido } from '@/lib/pedidos';
+import {
+  actualizarRegaloPedido,
+  cambiarEstadoPedido,
+  obtenerItemsDePedido,
+  obtenerPedidoPorCodigo,
+  quitarProductoDePedido,
+} from '@/lib/pedidos';
 import { obtenerPagosPorPedido } from '@/lib/pagos';
+import { obtenerRegalos } from '@/lib/regalos';
 import { ESTADOS_PEDIDO } from '@/types/pedido';
 import type { EstadoPedido, PedidoConDetalle } from '@/types/pedido';
 import type { Pago } from '@/types/pago';
 import type { Producto } from '@/types/producto';
+import type { Regalo } from '@/types/regalo';
 
 export default function DetallePedidoPage() {
   const params = useParams<{ codigo: string }>();
   const [pedido, setPedido] = useState<PedidoConDetalle | null>(null);
   const [items, setItems] = useState<{ id: string; producto: Producto }[]>([]);
   const [pagos, setPagos] = useState<Pago[]>([]);
+  const [regalos, setRegalos] = useState<Regalo[]>([]);
   const [cargando, setCargando] = useState(true);
   const [actualizando, setActualizando] = useState(false);
+  const [actualizandoRegalo, setActualizandoRegalo] = useState(false);
+  const [origen, setOrigen] = useState('');
+
+  useEffect(() => {
+    setOrigen(window.location.origin);
+  }, []);
+
+  const enlacePublico = pedido ? `${origen}/p/${pedido.enlace_token}` : '';
 
   async function cargar() {
     const encontrado = await obtenerPedidoPorCodigo(params.codigo);
     setPedido(encontrado);
     if (encontrado) {
-      const [listaItems, listaPagos] = await Promise.all([
+      const [listaItems, listaPagos, listaRegalos] = await Promise.all([
         obtenerItemsDePedido(encontrado.id),
         obtenerPagosPorPedido(encontrado.id),
+        obtenerRegalos(),
       ]);
       setItems(listaItems);
       setPagos(listaPagos);
+      setRegalos(listaRegalos);
     }
   }
 
@@ -58,6 +77,28 @@ export default function DetallePedidoPage() {
     }
   }
 
+  async function alternarIncluyeRegalo(activar: boolean) {
+    if (!pedido) return;
+    setActualizandoRegalo(true);
+    try {
+      await actualizarRegaloPedido(pedido.id, { incluye_regalo: activar });
+      await cargar();
+    } finally {
+      setActualizandoRegalo(false);
+    }
+  }
+
+  async function elegirRegaloManual(regaloId: string) {
+    if (!pedido) return;
+    setActualizandoRegalo(true);
+    try {
+      await actualizarRegaloPedido(pedido.id, { incluye_regalo: true, regalo_id: regaloId || null });
+      await cargar();
+    } finally {
+      setActualizandoRegalo(false);
+    }
+  }
+
   if (cargando) return <p className="py-20 text-center text-ink/40">Cargando pedido...</p>;
 
   if (!pedido) {
@@ -79,7 +120,10 @@ export default function DetallePedidoPage() {
 
       <div className="rounded-tag bg-white p-5 shadow-sm ring-1 ring-ink/5">
         <div className="flex items-center justify-between">
-          <span className="font-mono text-2xl font-bold text-hilo-dark">{pedido.codigo}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-2xl font-bold text-hilo-dark">{pedido.codigo}</span>
+            <BotonCopiar texto={pedido.codigo} />
+          </div>
           <span className="rounded-full bg-paper px-3 py-1 text-xs font-semibold uppercase tracking-wide text-ink/60">
             {pedido.estado}
           </span>
@@ -153,6 +197,67 @@ export default function DetallePedidoPage() {
         </ul>
       </section>
 
+      <section className="rounded-tag bg-white p-4 shadow-sm ring-1 ring-ink/5">
+        <label className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={pedido.incluye_regalo}
+            disabled={actualizandoRegalo}
+            onChange={(e) => alternarIncluyeRegalo(e.target.checked)}
+            className="h-5 w-5 accent-hilo"
+          />
+          <span className="font-semibold text-ink">🎁 Incluir regalo</span>
+        </label>
+
+        {pedido.incluye_regalo && (
+          <div className="mt-3 flex flex-col gap-2">
+            {pedido.regalo_id && pedido.regalo ? (
+              <p className="text-sm text-ink/70">
+                Regalo asignado: <span className="font-semibold text-hilo-dark">{pedido.regalo.nombre}</span>
+                {' · '}
+                <button onClick={() => elegirRegaloManual('')} className="text-hilo underline">
+                  quitar elección
+                </button>
+              </p>
+            ) : (
+              <>
+                <label className="text-sm text-ink/60" htmlFor="regalo-manual">
+                  Elegir regalo específico (opcional — si no eliges ninguno, lo decide la ruleta)
+                </label>
+                <select
+                  id="regalo-manual"
+                  disabled={actualizandoRegalo}
+                  onChange={(e) => elegirRegaloManual(e.target.value)}
+                  defaultValue=""
+                  className="rounded-tag border border-ink/10 px-3 py-2"
+                >
+                  <option value="">-- Dejar a la suerte (ruleta) --</option>
+                  {regalos.map((r) => (
+                    <option key={r.id} value={r.id} disabled={r.stock <= 0}>
+                      {r.nombre} ({r.stock} disponibles)
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="mt-4 flex gap-2">
+          <a
+            href={`https://wa.me/?text=${encodeURIComponent(
+              `¡Hola ${pedido.cliente.nombre}! 👋 Aquí puedes ver y confirmar tu pedido ${pedido.codigo}: ${enlacePublico}`
+            )}`}
+            target="_blank"
+            rel="noreferrer"
+            className="flex-1 rounded-tag bg-hilo px-4 py-3 text-center text-sm font-semibold text-white hover:bg-hilo-dark"
+          >
+            💬 Compartir por WhatsApp
+          </a>
+          <BotonCopiar texto={enlacePublico} etiqueta="🔗 Copiar enlace" />
+        </div>
+      </section>
+
       <Link
         href={`/preparacion?codigo=${pedido.codigo}`}
         className="rounded-tag bg-cordel-light px-6 py-4 text-center font-semibold text-ink hover:bg-cordel-light/70"
@@ -200,4 +305,42 @@ function EstadoValidacionBadge({ estado }: { estado: Pago['estado_validacion'] }
         : 'text-estado-reservado bg-estado-reservadoBg';
 
   return <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${estilos}`}>{estado}</span>;
+}
+
+function BotonCopiar({ texto, etiqueta }: { texto: string; etiqueta?: string }) {
+  const [copiado, setCopiado] = useState(false);
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1500);
+    } catch {
+      // Si el navegador no permite el portapapeles, no hacemos nada más.
+    }
+  }
+
+  if (etiqueta) {
+    return (
+      <button
+        type="button"
+        onClick={copiar}
+        className="flex-1 rounded-tag bg-white px-4 py-3 text-center text-sm font-semibold text-ink ring-1 ring-ink/10 hover:ring-hilo/40"
+      >
+        {copiado ? '✓ Copiado' : etiqueta}
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={copiar}
+      title="Copiar código"
+      aria-label="Copiar código"
+      className="rounded-tag px-2 py-1 text-sm text-ink/40 hover:bg-paper hover:text-ink"
+    >
+      {copiado ? '✓' : '📋'}
+    </button>
+  );
 }

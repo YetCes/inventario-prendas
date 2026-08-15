@@ -101,15 +101,16 @@ function PreparacionContenido() {
             onChange={(e) => setCodigoBusqueda(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && buscarPedido(codigoBusqueda)}
             placeholder="PED-00145"
-            className="flex-1 rounded-tag border border-ink/10 bg-white px-4 py-4 font-mono text-lg outline-none focus:border-hilo"
+            className="min-w-0 flex-1 rounded-tag border border-ink/10 bg-white px-4 py-4 font-mono text-lg outline-none focus:border-hilo"
             autoFocus
           />
           <button
             onClick={() => buscarPedido(codigoBusqueda)}
             disabled={buscando}
-            className="rounded-tag bg-ink px-5 font-semibold text-white disabled:opacity-50"
+            aria-label="Buscar"
+            className="flex-shrink-0 rounded-tag bg-ink px-4 text-lg font-semibold text-white disabled:opacity-50"
           >
-            Buscar
+            🔍
           </button>
         </section>
       )}

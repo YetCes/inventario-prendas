@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import StatusBadge from '@/components/StatusBadge';
 import { actualizarProducto, obtenerProductoPorCodigo } from '@/lib/productos';
+import { desvincularProductoDePedidos } from '@/lib/pedidos';
 import { ESTADOS } from '@/types/producto';
 import type { Estado, Producto } from '@/types/producto';
 
@@ -24,6 +25,9 @@ export default function DetalleProductoPage() {
     if (!producto) return;
     setActualizandoEstado(true);
     try {
+      // Si la prenda estaba vinculada a algún pedido, cambiar su estado aquí
+      // manualmente la desvincula de ese pedido, para que no quede desincronizada.
+      await desvincularProductoDePedidos(producto.id);
       const actualizado = await actualizarProducto(producto.id, { estado: nuevoEstado });
       setProducto(actualizado);
     } finally {
@@ -114,7 +118,7 @@ export default function DetalleProductoPage() {
           ))}
         </div>
         <p className="mt-1 text-xs text-ink/40">
-          Cambiar el estado aquí manualmente no crea ni actualiza ningún pedido — para eso usa "Asignar a cliente".
+          Si esta prenda pertenecía a un pedido, cambiar su estado aquí la desvincula de ese pedido.
         </p>
       </section>
 

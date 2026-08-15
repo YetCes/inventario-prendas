@@ -7,7 +7,7 @@ import ClienteForm from '@/components/ClienteForm';
 import QRScannerCamera from '@/components/QRScannerCamera';
 import { obtenerProductoPorCodigo } from '@/lib/productos';
 import { obtenerClientes, crearCliente } from '@/lib/clientes';
-import { asignarProductoACliente } from '@/lib/pedidos';
+import { actualizarRegaloPedido, asignarProductoACliente } from '@/lib/pedidos';
 import type { Producto } from '@/types/producto';
 import type { Cliente, NuevoCliente } from '@/types/pedido';
 
@@ -24,6 +24,7 @@ function VentaRapidaContenido() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [mostrarNuevoCliente, setMostrarNuevoCliente] = useState(false);
   const [escaneando, setEscaneando] = useState(false);
+  const [incluirRegalo, setIncluirRegalo] = useState(false);
 
   const [asignando, setAsignando] = useState(false);
   const [ultimaAsignacion, setUltimaAsignacion] = useState<{ codigo: string; cliente: string } | null>(null);
@@ -71,12 +72,16 @@ function VentaRapidaContenido() {
     if (!producto) return;
     setAsignando(true);
     try {
-      await asignarProductoACliente(producto.codigo, cliente.id);
+      const resultado = await asignarProductoACliente(producto.codigo, cliente.id);
+      if (incluirRegalo) {
+        await actualizarRegaloPedido(resultado.pedido.id, { incluye_regalo: true });
+      }
       setUltimaAsignacion({ codigo: producto.codigo, cliente: cliente.nombre });
       // listo para la siguiente prenda
       setCodigo('');
       setProducto(null);
       setBusquedaCliente('');
+      setIncluirRegalo(false);
       inputCodigoRef.current?.focus();
     } catch (e) {
       setErrorProducto(e instanceof Error ? e.message : 'No se pudo asignar la prenda.');
@@ -119,20 +124,22 @@ function VentaRapidaContenido() {
             onChange={(e) => setCodigo(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && buscarProducto(codigo)}
             placeholder="P-000145"
-            className="flex-1 rounded-tag border border-ink/10 bg-white px-4 py-4 font-mono text-lg outline-none focus:border-hilo"
+            className="min-w-0 flex-1 rounded-tag border border-ink/10 bg-white px-4 py-4 font-mono text-lg outline-none focus:border-hilo"
             autoFocus
           />
           <button
             onClick={() => buscarProducto(codigo)}
             disabled={buscandoProducto}
-            className="rounded-tag bg-ink px-5 font-semibold text-white disabled:opacity-50"
+            aria-label="Buscar"
+            className="flex-shrink-0 rounded-tag bg-ink px-4 text-lg font-semibold text-white disabled:opacity-50"
           >
-            Buscar
+            🔍
           </button>
           <button
             type="button"
             onClick={() => setEscaneando((v) => !v)}
-            className={`rounded-tag px-4 font-semibold ${
+            aria-label="Escanear QR"
+            className={`flex-shrink-0 rounded-tag px-4 text-lg font-semibold ${
               escaneando ? 'bg-cordel text-white' : 'bg-cordel-light text-ink'
             }`}
             title="Escanear QR"
@@ -168,6 +175,18 @@ function VentaRapidaContenido() {
             )}
           </div>
         </section>
+      )}
+
+      {producto && (
+        <label className="flex items-center gap-3 rounded-tag bg-white px-4 py-3 shadow-sm ring-1 ring-ink/5">
+          <input
+            type="checkbox"
+            checked={incluirRegalo}
+            onChange={(e) => setIncluirRegalo(e.target.checked)}
+            className="h-5 w-5 accent-hilo"
+          />
+          <span className="text-sm font-medium text-ink">🎁 Incluir regalo en este pedido</span>
+        </label>
       )}
 
       {producto && (
