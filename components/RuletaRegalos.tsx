@@ -23,12 +23,12 @@ export default function RuletaRegalos({
   const [ganador, setGanador] = useState<Regalo | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const total = regalos.reduce((suma, r) => suma + r.stock, 0);
-  let acumulado = 0;
+  // Los segmentos se muestran del mismo tamaño a propósito: la probabilidad
+  // real está ponderada por stock (ver lib/regalos.ts), pero no se revela
+  // visualmente para mantener la sorpresa del sorteo.
   const segmentos = regalos.map((regalo, i) => {
-    const inicio = (acumulado / total) * 360;
-    acumulado += regalo.stock;
-    const fin = (acumulado / total) * 360;
+    const inicio = (360 / regalos.length) * i;
+    const fin = (360 / regalos.length) * (i + 1);
     return { regalo, inicio, fin, color: COLORES[i % COLORES.length] };
   });
 

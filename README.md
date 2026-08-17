@@ -73,6 +73,36 @@ tenga puede abrirlo. Para que al menos no sea adivinable, usa un código secreto
 (`enlace_token`) en vez del número de pedido — no es una cuenta protegida, pero tampoco es
 algo que alguien pueda simplemente enumerar probando URLs.
 
+## Correcciones y mejoras posteriores
+
+- **Bug de reasignación corregido de forma robusta**: antes de asignar una prenda a un
+  cliente, el sistema ahora limpia cualquier vínculo de pedido "huérfano" que pudiera
+  quedar (de datos de prueba anteriores o de cualquier caso no previsto), así que una
+  prenda "Disponible" siempre se puede volver a asignar.
+- **Menú lateral**: acceso rápido a todas las pantallas desde la izquierda (colapsable en
+  celular, fijo en computadora). No aparece en la vista pública del cliente.
+- **Preparación de pedidos**: ahora también se puede elegir el pedido de una lista, además
+  de escribir su código. Y no se habilita hasta que el pedido tenga al menos un pago
+  registrado (para no despachar sin haber cobrado).
+- **Pedido pagado y validado = bloqueado**: una vez que la suma de pagos "Validados" cubre
+  el total del pedido, ya no se pueden quitar prendas ni cambiar el regalo, para que la
+  información quede íntegra.
+- **Ruleta**: los segmentos ahora se muestran del mismo tamaño a propósito (la probabilidad
+  real sigue ponderada por stock, pero no se revela visualmente, para mantener la sorpresa).
+  También se hizo más robusta ante clics dobles: si por algún motivo la asignación no se
+  aplicó, se muestra el regalo que realmente quedó guardado, nunca uno inconsistente.
+- **Nuevo flujo del enlace público**: primero se resuelve el regalo (si aplica) y recién
+  después se pide la confirmación del cliente — ya no hay un paso de "confirmar" antes de
+  la ruleta que no aportaba nada.
+- **Confirmación del cliente con utilidad real**: en vez de un solo botón "confirmar", ahora
+  el cliente elige "✅ Todo correcto" o "⚠️ Tengo una observación". Cualquiera de las dos
+  opciones abre WhatsApp con un mensaje pre-escrito hacia tu número (configurable con
+  `NEXT_PUBLIC_WHATSAPP_NEGOCIO` en `.env.local`), para que te llegue el aviso directo. El
+  detalle de la observación, si la hay, te lo dice el cliente por ese chat.
+- **Retirar prenda**: nuevo botón directo en el detalle de producto (con confirmación) para
+  el caso de "eliminar" una prenda — recordando que, tal como se definió desde el inicio,
+  nunca se borra físicamente: pasa a estado "Retirado".
+
 ## 1. Requisitos
 
 - Node.js 18 o superior.
@@ -86,6 +116,7 @@ algo que alguien pueda simplemente enumerar probando URLs.
    - `supabase/migrations/002_fase2_clientes_pedidos.sql` — tablas `clientes`, `pedidos` y `pedido_items`.
    - `supabase/migrations/003_fase3_pagos.sql` — tabla `pagos` y bucket de comprobantes.
    - `supabase/migrations/004_fase4_regalos.sql` — tabla `regalos`, columnas de regalo/enlace en `pedidos` y bucket de fotos de regalos.
+   - `supabase/migrations/005_confirmacion_cliente.sql` — columna de confirmación del cliente en `pedidos`.
 3. Ve a **Project Settings → API** y copia:
    - `Project URL`
    - `anon public key`

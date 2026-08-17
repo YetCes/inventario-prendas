@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { Fraunces, Inter, JetBrains_Mono } from 'next/font/google';
+import Sidebar from '@/components/Sidebar';
 import './globals.css';
 
 const display = Fraunces({
@@ -36,7 +37,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es">
       <body className={`${display.variable} ${body.variable} ${mono.variable} font-body bg-paper text-ink antialiased`}>
-        {children}
+        <div className="md:flex md:min-h-screen">
+          <Sidebar />
+          <div className="min-w-0 flex-1">{children}</div>
+        </div>
       </body>
     </html>
   );

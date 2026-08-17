@@ -4,8 +4,9 @@ import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import QRScannerCamera from '@/components/QRScannerCamera';
-import { marcarPedidoComoEntregado, obtenerPedidoPorCodigo } from '@/lib/pedidos';
-import type { PedidoConDetalle } from '@/types/pedido';
+import { marcarPedidoComoEntregado, obtenerPedidoPorCodigo, obtenerPedidos } from '@/lib/pedidos';
+import { obtenerPagosPorPedido } from '@/lib/pagos';
+import type { PedidoConDetalle, PedidoResumen } from '@/types/pedido';
 
 function PreparacionContenido() {
   const searchParams = useSearchParams();
@@ -15,6 +16,9 @@ function PreparacionContenido() {
   const [buscando, setBuscando] = useState(false);
   const [errorBusqueda, setErrorBusqueda] = useState<string | null>(null);
 
+  const [pedidosParaElegir, setPedidosParaElegir] = useState<PedidoResumen[]>([]);
+  const [tienePagoRegistrado, setTienePagoRegistrado] = useState<boolean | null>(null);
+
   const [verificados, setVerificados] = useState<Set<string>>(new Set());
   const [escaneando, setEscaneando] = useState(false);
   const [ultimoMensaje, setUltimoMensaje] = useState<{ ok: boolean; texto: string } | null>(null);
@@ -23,9 +27,21 @@ function PreparacionContenido() {
   const [despachado, setDespachado] = useState(false);
 
   useEffect(() => {
-    if (searchParams.get('codigo')) buscarPedido(searchParams.get('codigo')!);
+    if (searchParams.get('codigo')) {
+      buscarPedido(searchParams.get('codigo')!);
+    } else {
+      cargarPedidosParaElegir();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function cargarPedidosParaElegir() {
+    const [abiertos, confirmados] = await Promise.all([
+      obtenerPedidos({ estado: 'Abierto' }),
+      obtenerPedidos({ estado: 'Confirmado' }),
+    ]);
+    setPedidosParaElegir([...confirmados, ...abiertos]);
+  }
 
   async function buscarPedido(codigo: string) {
     if (!codigo.trim()) return;
@@ -34,13 +50,16 @@ function PreparacionContenido() {
     setPedido(null);
     setVerificados(new Set());
     setDespachado(false);
+    setTienePagoRegistrado(null);
     try {
       const encontrado = await obtenerPedidoPorCodigo(codigo);
       if (!encontrado) {
         setErrorBusqueda(`No existe ningún pedido con el código "${codigo}".`);
-      } else {
-        setPedido(encontrado);
+        return;
       }
+      setPedido(encontrado);
+      const pagos = await obtenerPagosPorPedido(encontrado.id);
+      setTienePagoRegistrado(pagos.length > 0);
     } catch (e) {
       setErrorBusqueda(e instanceof Error ? e.message : 'No se pudo buscar el pedido.');
     } finally {
@@ -95,29 +114,75 @@ function PreparacionContenido() {
       </header>
 
       {!pedido && (
-        <section className="flex gap-2">
-          <input
-            value={codigoBusqueda}
-            onChange={(e) => setCodigoBusqueda(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && buscarPedido(codigoBusqueda)}
-            placeholder="PED-00145"
-            className="min-w-0 flex-1 rounded-tag border border-ink/10 bg-white px-4 py-4 font-mono text-lg outline-none focus:border-hilo"
-            autoFocus
-          />
-          <button
-            onClick={() => buscarPedido(codigoBusqueda)}
-            disabled={buscando}
-            aria-label="Buscar"
-            className="flex-shrink-0 rounded-tag bg-ink px-4 text-lg font-semibold text-white disabled:opacity-50"
-          >
-            🔍
-          </button>
-        </section>
+        <>
+          <section className="flex gap-2">
+            <input
+              value={codigoBusqueda}
+              onChange={(e) => setCodigoBusqueda(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && buscarPedido(codigoBusqueda)}
+              placeholder="PED-00145"
+              className="min-w-0 flex-1 rounded-tag border border-ink/10 bg-white px-4 py-4 font-mono text-lg outline-none focus:border-hilo"
+              autoFocus
+            />
+            <button
+              onClick={() => buscarPedido(codigoBusqueda)}
+              disabled={buscando}
+              aria-label="Buscar"
+              className="flex-shrink-0 rounded-tag bg-ink px-4 text-lg font-semibold text-white disabled:opacity-50"
+            >
+              🔍
+            </button>
+          </section>
+
+          <section>
+            <p className="mb-2 text-sm font-semibold text-ink/70">O elige un pedido de la lista</p>
+            <ul className="flex flex-col divide-y divide-ink/5 rounded-tag bg-white ring-1 ring-ink/5">
+              {pedidosParaElegir.map((p) => (
+                <li key={p.id}>
+                  <button
+                    onClick={() => buscarPedido(p.codigo)}
+                    className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-hilo-light/40"
+                  >
+                    <span>
+                      <span className="block font-mono font-bold text-hilo-dark">{p.codigo}</span>
+                      <span className="text-sm text-ink/60">{p.cliente.nombre}</span>
+                    </span>
+                    <span className="text-sm text-ink/40">
+                      {p.cantidad_prendas} {p.cantidad_prendas === 1 ? 'prenda' : 'prendas'}
+                    </span>
+                  </button>
+                </li>
+              ))}
+              {pedidosParaElegir.length === 0 && (
+                <p className="px-4 py-8 text-center text-ink/40">No hay pedidos pendientes de preparar.</p>
+              )}
+            </ul>
+          </section>
+        </>
       )}
 
       {errorBusqueda && <p className="text-sm font-medium text-red-600">{errorBusqueda}</p>}
 
-      {pedido && !despachado && (
+      {pedido && tienePagoRegistrado === false && (
+        <section className="flex flex-col items-center gap-3 rounded-tag bg-white p-6 text-center shadow-sm ring-1 ring-ink/5">
+          <p className="text-3xl">💳</p>
+          <p className="font-display text-lg text-ink">Este pedido todavía no tiene ningún pago registrado</p>
+          <p className="text-sm text-ink/50">
+            Registra al menos un pago antes de prepararlo, para no despachar prendas sin cobrar.
+          </p>
+          <Link
+            href={`/pedidos/${pedido.codigo}/pagos/nuevo`}
+            className="rounded-tag bg-hilo px-6 py-3 font-semibold text-white hover:bg-hilo-dark"
+          >
+            Registrar pago
+          </Link>
+          <button onClick={() => setPedido(null)} className="text-sm text-ink/40">
+            ← Elegir otro pedido
+          </button>
+        </section>
+      )}
+
+      {pedido && tienePagoRegistrado && !despachado && (
         <>
           <section className="rounded-tag bg-white p-4 shadow-sm ring-1 ring-ink/5">
             <p className="font-mono text-xl font-bold text-hilo-dark">{pedido.codigo}</p>

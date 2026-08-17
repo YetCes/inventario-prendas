@@ -22,6 +22,8 @@ export type EstadoPedido = 'Abierto' | 'Confirmado' | 'Entregado' | 'Cancelado';
 
 export const ESTADOS_PEDIDO: EstadoPedido[] = ['Abierto', 'Confirmado', 'Entregado', 'Cancelado'];
 
+export type ConfirmacionCliente = 'Pendiente' | 'Aceptado' | 'Observado';
+
 export interface Pedido {
   id: string;
   codigo: string;
@@ -33,6 +35,7 @@ export interface Pedido {
   regalo_id: string | null;
   regalo_asignado_en: string | null;
   enlace_token: string;
+  confirmacion_cliente: ConfirmacionCliente;
 }
 
 // Pedido con sus datos relacionados ya resueltos, tal como se

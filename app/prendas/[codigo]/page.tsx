@@ -128,6 +128,20 @@ export default function DetalleProductoPage() {
       >
         🏷️ Generar etiqueta
       </Link>
+
+      {producto.estado !== 'Retirado' && (
+        <button
+          onClick={() => {
+            if (window.confirm(`¿Retirar "${producto.codigo}" del inventario activo? No se elimina, solo pasa a "Retirado".`)) {
+              cambiarEstado('Retirado');
+            }
+          }}
+          disabled={actualizandoEstado}
+          className="rounded-tag px-6 py-3 text-center text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+        >
+          🗑️ Retirar prenda
+        </button>
+      )}
     </main>
   );
 }

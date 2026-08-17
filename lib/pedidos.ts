@@ -56,6 +56,12 @@ export async function asignarProductoACliente(
     throw new Error(`La prenda ${producto.codigo} ya está "${producto.estado}" y no se puede asignar.`);
   }
 
+  // Por seguridad: si por algún motivo quedó un vínculo de pedido "huérfano"
+  // para esta prenda (de una versión anterior del sistema, o de datos de
+  // prueba), lo limpiamos antes de intentar asignarla de nuevo. Una prenda
+  // "Disponible" nunca debería tener un pedido_items vigente.
+  await desvincularProductoDePedidos(producto.id);
+
   const { pedido, creadoAhora } = await obtenerOCrearPedidoAbierto(clienteId);
 
   const { error: errorItem } = await supabase
@@ -202,14 +208,46 @@ export async function actualizarRegaloPedido(
 export async function asignarRegaloPorRuleta(pedidoId: string): Promise<Regalo> {
   const ganador = await elegirRegaloPonderado();
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('pedidos')
     .update({ regalo_id: ganador.id, regalo_asignado_en: new Date().toISOString() })
     .eq('id', pedidoId)
-    .is('regalo_id', null);
+    .is('regalo_id', null)
+    .select('regalo_id')
+    .maybeSingle();
 
   if (error) throw error;
-  return ganador;
+
+  if (data) {
+    // Nuestra actualización sí se aplicó: el ganador es el que acabamos de sortear.
+    return ganador;
+  }
+
+  // Si no se aplicó (por ejemplo, un doble clic que ya había asignado un
+  // regalo un instante antes), devolvemos el que realmente quedó guardado,
+  // para que lo que ve el cliente siempre coincida con lo que hay en la base.
+  const { data: pedidoActual, error: errorLectura } = await supabase
+    .from('pedidos')
+    .select('regalo:regalos(*)')
+    .eq('id', pedidoId)
+    .single();
+  if (errorLectura) throw errorLectura;
+
+  const regaloCrudo = (pedidoActual as any).regalo;
+  return (Array.isArray(regaloCrudo) ? regaloCrudo[0] : regaloCrudo) as Regalo;
+}
+
+/**
+ * Registra la respuesta del cliente desde su enlace público (¿todo bien con
+ * el pedido, o tiene una observación?). El detalle de la observación, si la
+ * hay, se resuelve por fuera del sistema (WhatsApp), tal como se acordó.
+ */
+export async function actualizarConfirmacionCliente(
+  pedidoId: string,
+  confirmacion: 'Aceptado' | 'Observado'
+): Promise<void> {
+  const { error } = await supabase.from('pedidos').update({ confirmacion_cliente: confirmacion }).eq('id', pedidoId);
+  if (error) throw error;
 }
 
 export interface FiltrosPedidos {

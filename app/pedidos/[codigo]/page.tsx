@@ -36,6 +36,13 @@ export default function DetallePedidoPage() {
 
   const enlacePublico = pedido ? `${origen}/p/${pedido.enlace_token}` : '';
 
+  // Una vez que el pedido está pagado y validado por completo, se bloquean
+  // las acciones que modifican su contenido (quitar prendas, cambiar el
+  // regalo) para que la información quede íntegra.
+  const totalValidado = pagos.filter((p) => p.estado_validacion === 'Validado').reduce((s, p) => s + p.monto, 0);
+  const pagadoCompleto = (pedido?.total ?? 0) > 0 && totalValidado >= (pedido?.total ?? 0);
+  const tienePagoRegistrado = pagos.length > 0;
+
   async function cargar() {
     const encontrado = await obtenerPedidoPorCodigo(params.codigo);
     setPedido(encontrado);
@@ -154,10 +161,10 @@ export default function DetallePedidoPage() {
                   </span>
                 )}
                 <button
-                  disabled={actualizando}
+                  disabled={actualizando || pagadoCompleto}
                   onClick={() => quitarPrenda(item.id, item.producto.id)}
-                  className="text-sm text-ink/40 hover:text-red-600 disabled:opacity-50"
-                  title="Quitar del pedido"
+                  className="text-sm text-ink/40 hover:text-red-600 disabled:opacity-30"
+                  title={pagadoCompleto ? 'Pedido pagado: no se puede modificar' : 'Quitar del pedido'}
                 >
                   ✕
                 </button>
@@ -198,11 +205,16 @@ export default function DetallePedidoPage() {
       </section>
 
       <section className="rounded-tag bg-white p-4 shadow-sm ring-1 ring-ink/5">
+        {pagadoCompleto && (
+          <p className="mb-3 rounded-tag bg-paper px-3 py-2 text-xs text-ink/50">
+            🔒 Este pedido ya está pagado y validado — para mantener la información íntegra, el regalo y las prendas ya no se pueden modificar.
+          </p>
+        )}
         <label className="flex items-center gap-3">
           <input
             type="checkbox"
             checked={pedido.incluye_regalo}
-            disabled={actualizandoRegalo}
+            disabled={actualizandoRegalo || pagadoCompleto}
             onChange={(e) => alternarIncluyeRegalo(e.target.checked)}
             className="h-5 w-5 accent-hilo"
           />
@@ -214,10 +226,14 @@ export default function DetallePedidoPage() {
             {pedido.regalo_id && pedido.regalo ? (
               <p className="text-sm text-ink/70">
                 Regalo asignado: <span className="font-semibold text-hilo-dark">{pedido.regalo.nombre}</span>
-                {' · '}
-                <button onClick={() => elegirRegaloManual('')} className="text-hilo underline">
-                  quitar elección
-                </button>
+                {!pagadoCompleto && (
+                  <>
+                    {' · '}
+                    <button onClick={() => elegirRegaloManual('')} className="text-hilo underline">
+                      quitar elección
+                    </button>
+                  </>
+                )}
               </p>
             ) : (
               <>
@@ -226,7 +242,7 @@ export default function DetallePedidoPage() {
                 </label>
                 <select
                   id="regalo-manual"
-                  disabled={actualizandoRegalo}
+                  disabled={actualizandoRegalo || pagadoCompleto}
                   onChange={(e) => elegirRegaloManual(e.target.value)}
                   defaultValue=""
                   className="rounded-tag border border-ink/10 px-3 py-2"
@@ -258,12 +274,18 @@ export default function DetallePedidoPage() {
         </div>
       </section>
 
-      <Link
-        href={`/preparacion?codigo=${pedido.codigo}`}
-        className="rounded-tag bg-cordel-light px-6 py-4 text-center font-semibold text-ink hover:bg-cordel-light/70"
-      >
-        📷 Preparar pedido (verificar con QR)
-      </Link>
+      {tienePagoRegistrado ? (
+        <Link
+          href={`/preparacion?codigo=${pedido.codigo}`}
+          className="rounded-tag bg-cordel-light px-6 py-4 text-center font-semibold text-ink hover:bg-cordel-light/70"
+        >
+          📷 Preparar pedido (verificar con QR)
+        </Link>
+      ) : (
+        <p className="rounded-tag bg-paper px-6 py-4 text-center text-sm text-ink/50">
+          💳 Registra un pago para poder preparar este pedido.
+        </p>
+      )}
 
       <section>
         <p className="mb-2 text-sm font-semibold text-ink/70">Cambiar estado del pedido</p>
